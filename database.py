@@ -49,8 +49,36 @@ def _fix_asyncpg_url(raw_url: str) -> str:
 # ═══════════════════════════  ENGINE  ══════════════════════════════════════
 
 _raw = os.getenv("DATABASE_URL")
+
+# Некоторые хостинги (Railway, Heroku) могут назвать переменную иначе
 if not _raw:
-    raise RuntimeError("DATABASE_URL не задан! Проверь .env")
+    _raw = os.getenv("DATABASE_PRIVATE_URL")
+if not _raw:
+    _raw = os.getenv("DATABASE_PUBLIC_URL")
+if not _raw:
+    _raw = os.getenv("PGDATABASE")  # Railway иногда задаёт отдельные PG-переменные
+
+# Если Railway задал отдельные PG_* переменные — собираем URL вручную
+if not _raw:
+    pg_host = os.getenv("PGHOST")
+    pg_user = os.getenv("PGUSER") or os.getenv("POSTGRES_USER")
+    pg_pass = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD")
+    pg_db = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB")
+    pg_port = os.getenv("PGPORT", "5432")
+    if pg_host and pg_user and pg_pass and pg_db:
+        _raw = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}?sslmode=require"
+
+if not _raw:
+    import sys
+    print("❌ DATABASE_URL не задан!", file=sys.stderr)
+    print("   Доступные переменные окружения:", file=sys.stderr)
+    for k, v in sorted(os.environ.items()):
+        if any(word in k.upper() for word in ("PG", "DB", "DATA", "SQL", "POSTGRES", "NEON")):
+            print(f"     {k}={v[:50]}...", file=sys.stderr)
+    raise RuntimeError(
+        "DATABASE_URL не задан! На Railway добавь переменную DATABASE_URL "
+        "во вкладке Variables. Значение — строка подключения из Neon."
+    )
 
 DATABASE_URL = _fix_asyncpg_url(_raw)
 
