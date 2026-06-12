@@ -1,0 +1,6 @@
+aiogram==3.13.0
+SQLAlchemy==2.0.32
+asyncpg==0.30.0
+greenlet>=3.0.0
+pydantic-settings
+python-dotenv
